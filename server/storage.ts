@@ -3,13 +3,24 @@ import {
   portfolios, 
   transactions, 
   referrals,
+  deposits,
+  investments,
+  withdrawalRequests,
   type User, 
   type InsertUser,
   type Portfolio,
   type Transaction,
   type InsertTransaction,
-  type Referral 
+  type Referral,
+  type Deposit,
+  type InsertDeposit,
+  type Investment,
+  type InsertInvestment,
+  type WithdrawalRequest,
+  type InsertWithdrawal
 } from "@shared/schema";
+import { db } from "./db";
+import { eq, desc } from "drizzle-orm";
 
 export interface IStorage {
   // User methods
@@ -29,58 +40,50 @@ export interface IStorage {
   // Referral methods
   getReferralsByUser(userId: number): Promise<Referral[]>;
   createReferral(referrerId: number, referredId: number): Promise<Referral>;
+  
+  // Deposit methods
+  createDeposit(deposit: InsertDeposit): Promise<Deposit>;
+  getDepositsByUser(userId: number): Promise<Deposit[]>;
+  updateDepositStatus(depositId: number, status: string): Promise<Deposit>;
+  
+  // Investment methods
+  createInvestment(investment: InsertInvestment): Promise<Investment>;
+  getInvestmentsByUser(userId: number): Promise<Investment[]>;
+  updateInvestmentProfit(investmentId: number, totalProfit: string): Promise<Investment>;
+  getActiveInvestments(userId: number): Promise<Investment[]>;
+  
+  // Withdrawal methods
+  createWithdrawalRequest(withdrawal: InsertWithdrawal): Promise<WithdrawalRequest>;
+  getWithdrawalsByUser(userId: number): Promise<WithdrawalRequest[]>;
+  updateWithdrawalStatus(withdrawalId: number, status: string, txHash?: string): Promise<WithdrawalRequest>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<number, User>;
-  private portfolios: Map<number, Portfolio>;
-  private transactions: Map<number, Transaction>;
-  private referrals: Map<number, Referral>;
-  private currentUserId: number;
-  private currentPortfolioId: number;
-  private currentTransactionId: number;
-  private currentReferralId: number;
-
-  constructor() {
-    this.users = new Map();
-    this.portfolios = new Map();
-    this.transactions = new Map();
-    this.referrals = new Map();
-    this.currentUserId = 1;
-    this.currentPortfolioId = 1;
-    this.currentTransactionId = 1;
-    this.currentReferralId = 1;
-  }
+export class DatabaseStorage implements IStorage {
 
   async getUser(id: number): Promise<User | undefined> {
-    return this.users.get(id);
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.email === email,
-    );
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = this.currentUserId++;
-    const user: User = { 
-      ...insertUser, 
-      id,
+    const [user] = await db.insert(users).values({
+      ...insertUser,
       walletBalance: "15.00", // Signup bonus
-      solanaAddress: null,
-      referralCode: `REF${id.toString().padStart(6, '0')}`,
+      referralCode: `REF${Date.now()}`,
       referredBy: insertUser.referralCode || null,
-      createdAt: new Date(),
-    };
-    this.users.set(id, user);
+    }).returning();
 
     // Create initial portfolio
-    await this.createPortfolio(id);
+    await this.createPortfolio(user.id);
 
     // Create signup bonus transaction
     await this.createTransaction({
-      userId: id,
+      userId: user.id,
       type: "signup_bonus",
       amount: "15.00",
       description: "Welcome bonus for new user registration",
@@ -90,73 +93,138 @@ export class MemStorage implements IStorage {
   }
 
   async getPortfolio(userId: number): Promise<Portfolio | undefined> {
-    return Array.from(this.portfolios.values()).find(
-      (portfolio) => portfolio.userId === userId,
-    );
+    const [portfolio] = await db.select().from(portfolios).where(eq(portfolios.userId, userId));
+    return portfolio;
   }
 
   async createPortfolio(userId: number): Promise<Portfolio> {
-    const id = this.currentPortfolioId++;
-    const portfolio: Portfolio = {
-      id,
+    const [portfolio] = await db.insert(portfolios).values({
       userId,
       totalValue: "0.00",
-      lastUpdated: new Date(),
-    };
-    this.portfolios.set(id, portfolio);
+    }).returning();
     return portfolio;
   }
 
   async updatePortfolioValue(userId: number, totalValue: string): Promise<Portfolio> {
-    const portfolio = await this.getPortfolio(userId);
+    const [portfolio] = await db.update(portfolios)
+      .set({ totalValue, lastUpdated: new Date() })
+      .where(eq(portfolios.userId, userId))
+      .returning();
+    
     if (!portfolio) {
       throw new Error("Portfolio not found");
     }
-    
-    const updatedPortfolio: Portfolio = {
-      ...portfolio,
-      totalValue,
-      lastUpdated: new Date(),
-    };
-    this.portfolios.set(portfolio.id, updatedPortfolio);
-    return updatedPortfolio;
+    return portfolio;
   }
 
   async getTransactionsByUser(userId: number): Promise<Transaction[]> {
-    return Array.from(this.transactions.values())
-      .filter((transaction) => transaction.userId === userId)
-      .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
+    return await db.select()
+      .from(transactions)
+      .where(eq(transactions.userId, userId))
+      .orderBy(desc(transactions.createdAt));
   }
 
   async createTransaction(insertTransaction: InsertTransaction): Promise<Transaction> {
-    const id = this.currentTransactionId++;
-    const transaction: Transaction = {
-      ...insertTransaction,
-      id,
-      createdAt: new Date(),
-    };
-    this.transactions.set(id, transaction);
+    const [transaction] = await db.insert(transactions).values(insertTransaction).returning();
     return transaction;
   }
 
   async getReferralsByUser(userId: number): Promise<Referral[]> {
-    return Array.from(this.referrals.values()).filter(
-      (referral) => referral.referrerId === userId,
-    );
+    return await db.select()
+      .from(referrals)
+      .where(eq(referrals.referrerId, userId));
   }
 
   async createReferral(referrerId: number, referredId: number): Promise<Referral> {
-    const id = this.currentReferralId++;
-    const referral: Referral = {
-      id,
+    const [referral] = await db.insert(referrals).values({
       referrerId,
       referredId,
       bonusAmount: "15.00",
-      createdAt: new Date(),
-    };
-    this.referrals.set(id, referral);
+    }).returning();
     return referral;
+  }
+
+  // Deposit methods
+  async createDeposit(deposit: InsertDeposit): Promise<Deposit> {
+    const [newDeposit] = await db.insert(deposits).values(deposit).returning();
+    return newDeposit;
+  }
+
+  async getDepositsByUser(userId: number): Promise<Deposit[]> {
+    return await db.select()
+      .from(deposits)
+      .where(eq(deposits.userId, userId))
+      .orderBy(desc(deposits.createdAt));
+  }
+
+  async updateDepositStatus(depositId: number, status: string): Promise<Deposit> {
+    const [deposit] = await db.update(deposits)
+      .set({ status, processedAt: new Date() })
+      .where(eq(deposits.id, depositId))
+      .returning();
+    
+    if (!deposit) {
+      throw new Error("Deposit not found");
+    }
+    return deposit;
+  }
+
+  // Investment methods
+  async createInvestment(investment: InsertInvestment): Promise<Investment> {
+    const [newInvestment] = await db.insert(investments).values(investment).returning();
+    return newInvestment;
+  }
+
+  async getInvestmentsByUser(userId: number): Promise<Investment[]> {
+    return await db.select()
+      .from(investments)
+      .where(eq(investments.userId, userId))
+      .orderBy(desc(investments.createdAt));
+  }
+
+  async updateInvestmentProfit(investmentId: number, totalProfit: string): Promise<Investment> {
+    const [investment] = await db.update(investments)
+      .set({ totalProfit })
+      .where(eq(investments.id, investmentId))
+      .returning();
+    
+    if (!investment) {
+      throw new Error("Investment not found");
+    }
+    return investment;
+  }
+
+  async getActiveInvestments(userId: number): Promise<Investment[]> {
+    return await db.select()
+      .from(investments)
+      .where(eq(investments.userId, userId))
+      .where(eq(investments.status, "active"));
+  }
+
+  // Withdrawal methods
+  async createWithdrawalRequest(withdrawal: InsertWithdrawal): Promise<WithdrawalRequest> {
+    const [newWithdrawal] = await db.insert(withdrawalRequests).values(withdrawal).returning();
+    return newWithdrawal;
+  }
+
+  async getWithdrawalsByUser(userId: number): Promise<WithdrawalRequest[]> {
+    return await db.select()
+      .from(withdrawalRequests)
+      .where(eq(withdrawalRequests.userId, userId))
+      .orderBy(desc(withdrawalRequests.requestedAt));
+  }
+
+  async updateWithdrawalStatus(withdrawalId: number, status: string, txHash?: string): Promise<WithdrawalRequest> {
+    const [withdrawal] = await db.update(withdrawalRequests)
+      .set({ status, processedAt: new Date(), txHash })
+      .where(eq(withdrawalRequests.id, withdrawalId))
+      .returning();
+    
+    if (!withdrawal) {
+      throw new Error("Withdrawal request not found");
+    }
+    return withdrawal;
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();

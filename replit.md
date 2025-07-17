@@ -4,6 +4,13 @@
 
 Okamah$Vesting is a modern full-stack investment dashboard platform that combines traditional investment tracking with blockchain integration. The platform provides users with portfolio management capabilities, Solana wallet integration, and a referral rewards system with instant bonuses.
 
+**Recent Updates (January 2025):**
+- Implemented full PostgreSQL database with Drizzle ORM
+- Added comprehensive investment flow with 2-3.5% daily ROI over 7 days
+- Created deposit system with Solana wallet integration
+- Built withdrawal request system with admin approval
+- Enhanced dashboard with functional deposit, investment, and withdrawal sections
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.

@@ -2,6 +2,8 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { signupSchema, loginSchema } from "@shared/schema";
+import { registerInvestmentRoutes } from "./investmentRoutes";
+import { registerWithdrawalRoutes } from "./withdrawalRoutes";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -120,6 +122,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Internal server error" });
     }
   });
+
+  // Register investment and withdrawal routes
+  registerInvestmentRoutes(app);
+  registerWithdrawalRoutes(app);
 
   const httpServer = createServer(app);
   return httpServer;
