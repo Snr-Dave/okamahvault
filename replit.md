@@ -10,6 +10,8 @@ Okamah$Vesting is a modern full-stack investment dashboard platform that combine
 - Created deposit system with Solana wallet integration
 - Built withdrawal request system with admin approval
 - Enhanced dashboard with functional deposit, investment, and withdrawal sections
+- Created complete navigation system with Portfolio, Wallet, Referrals, and Settings pages
+- Built standalone explainer site with marketing pages and live chat widget
 
 ## User Preferences
 
@@ -33,6 +35,19 @@ Preferred communication style: Simple, everyday language.
 - **Authentication**: JWT-based authentication system (planned implementation)
 
 ### Key Components
+
+#### Dashboard Application
+- **Portfolio Page**: Investment performance tracking with stats and charts
+- **Wallet Page**: Balance overview and transaction history
+- **Referrals Page**: Referral system with sharing tools and earnings tracking
+- **Settings Page**: Comprehensive account management and preferences
+
+#### Explainer Site (`explainer-site/`)
+- **Home**: Hero section with purple gradient branding and CTA
+- **How It Works**: Step-by-step investment process guide
+- **Plans**: 7-day investment cycle details with animated stats
+- **Referral**: Referral program explanation and sample codes
+- **Contact**: Live chat widget integration for 24/7 support
 
 #### Database Schema
 The application uses four main tables:
