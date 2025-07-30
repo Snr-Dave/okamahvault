@@ -1,10 +1,10 @@
-# Okamah$Vesting - Investment Dashboard
+# OkamahVault - Investment Dashboard
 
 A modern full-stack investment dashboard platform built with React, Express, and PostgreSQL, featuring Solana wallet integration and referral rewards system.
 
 ## 🎯 Project Purpose
 
-Okamah$Vesting is an investment dashboard that provides users with:
+OkamahVault is an investment dashboard that provides users with:
 - Portfolio management and tracking
 - Secure wallet integration with Solana blockchain
 - Referral rewards system with instant bonuses
